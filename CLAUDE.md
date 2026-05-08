@@ -30,6 +30,7 @@ Every contribution lives in its own subfolder under the right category and must 
 - **No credentials, API keys, or secrets in any file.** Use environment variables.
 - **No binary blobs** over 1MB. No `.exe`, `.dmg`, `.zip`, `.tar.gz`.
 - **No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`** in SQL files.
+- **Avoid profanity in all content.** Keep docs, examples, seed data, UI copy, prompts, walkthroughs, and generated assets clean and professional.
 - **MCP servers must be remote (Supabase Edge Functions), not local.** Never use `claude_desktop_config.json`, `StdioServerTransport`, or local Node.js servers. All extensions deploy as Edge Functions and connect via Claude Desktop's custom connectors UI (Settings → Connectors → Add custom connector → paste URL). See `docs/01-getting-started.md` Step 7 for the pattern.
 
 ## PR Standards
