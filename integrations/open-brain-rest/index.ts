@@ -626,6 +626,66 @@ app.post("/thought/:id/reflection", async (c) => {
   return c.json(data, 200, corsHeaders);
 });
 
+const sessionListSelect =
+  "id, project_id, client, client_session_id, title, summary, tags, started_at, ended_at, created_at, updated_at";
+const sessionDetailSelect =
+  "id, project_id, client, client_session_id, title, summary, highlights, next_steps, entities, tags, started_at, ended_at, created_at, updated_at";
+const projectSelect =
+  "id, name, slug, description, status, goals, tags, color, created_at, updated_at, last_active_at";
+
+app.get("/projects", async (c) => {
+  const url = new URL(c.req.url);
+  const status = url.searchParams.get("status");
+  const limit = intParam(url.searchParams.get("limit"), 100, 1, 500);
+  let q = supabase.from("tracked_projects").select(projectSelect).order("last_active_at", { ascending: false, nullsFirst: false }).limit(limit);
+  if (status) q = q.eq("status", status);
+  const { data, error } = await q;
+  if (error) return c.json({ error: error.message }, 500, corsHeaders);
+  return c.json({ data: data || [], count: data?.length || 0 }, 200, corsHeaders);
+});
+
+app.get("/sessions", async (c) => {
+  const url = new URL(c.req.url);
+  const projectId = url.searchParams.get("project_id");
+  const client = url.searchParams.get("client");
+  const search = url.searchParams.get("q");
+  const page = intParam(url.searchParams.get("page"), 1, 1, 10000);
+  const perPage = intParam(url.searchParams.get("per_page"), 25, 1, 100);
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+  let q = supabase
+    .from("tracked_sessions")
+    .select(sessionListSelect, { count: "exact" })
+    .order("started_at", { ascending: false, nullsFirst: false })
+    .range(from, to);
+  if (projectId) q = q.eq("project_id", projectId);
+  if (client) q = q.eq("client", client);
+  if (search) q = q.or(`title.ilike.%${search}%,summary.ilike.%${search}%`);
+  const { data, error, count } = await q;
+  if (error) return c.json({ error: error.message }, 500, corsHeaders);
+  return c.json({ data: data || [], total: count ?? 0, page, per_page: perPage }, 200, corsHeaders);
+});
+
+app.get("/sessions/:id", async (c) => {
+  const id = c.req.param("id");
+  const { data, error } = await supabase
+    .from("tracked_sessions")
+    .select(sessionDetailSelect)
+    .eq("id", id)
+    .single();
+  if (error) return c.json({ error: error.message }, 404, corsHeaders);
+  let project: Record<string, unknown> | null = null;
+  if (data?.project_id) {
+    const { data: projectRow } = await supabase
+      .from("tracked_projects")
+      .select(projectSelect)
+      .eq("id", data.project_id)
+      .single();
+    project = projectRow || null;
+  }
+  return c.json({ ...data, project }, 200, corsHeaders);
+});
+
 app.get("/ingestion-jobs", (c) => c.json({ jobs: [], count: 0 }, 200, corsHeaders));
 app.get("/ingestion-jobs/:id", (c) => c.json({ job: null, items: [] }, 200, corsHeaders));
 app.post("/ingestion-jobs/:id/execute", (c) => c.json({ job_id: c.req.param("id"), status: "not_configured" }, 200, corsHeaders));
