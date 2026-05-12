@@ -28,4 +28,6 @@ export interface ExtensionNavEntry {
   icon: ExtensionIcon;
 }
 
-export const EXTENSIONS: ExtensionNavEntry[] = [];
+export const EXTENSIONS: ExtensionNavEntry[] = [
+  { href: "/sessions", label: "Sessions", icon: "clock" },
+];
