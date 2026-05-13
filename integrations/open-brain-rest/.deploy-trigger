@@ -1,3 +1,0 @@
-# Smoke test marker for the Edge Function deploy workflow.
-# Touching any file under integrations/open-brain-rest/ triggers a redeploy.
-# Safe to delete after the first successful deploy run.
