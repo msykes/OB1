@@ -10,6 +10,11 @@ on:
 # changes on main. Detects which functions changed and deploys only those.
 # Requires repo secret SUPABASE_ACCESS_TOKEN (account-level PAT from Supabase Dashboard
 # -> Account -> Access Tokens).
+#
+# Staging the function for deploy:
+#   The Supabase CLI expects functions at supabase/functions/<name>/. We rsync
+#   from integrations/<name>/ into that path, excluding docs, metadata, and
+#   smoke/test directories so they don't bloat the deployed bundle.
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -43,11 +48,20 @@ jobs:
               continue
             fi
             echo "::group::Deploy $fn"
-            # Supabase CLI expects functions under supabase/functions/<name>/.
-            # Stage the files into that layout for the deploy step.
             mkdir -p "supabase/functions/$fn"
-            cp -r "integrations/$fn/".* "supabase/functions/$fn/" 2>/dev/null || true
-            cp -r "integrations/$fn/"* "supabase/functions/$fn/"
+            # Source-only copy: skip docs, metadata, smoke/test scripts,
+            # and stray dotfiles like .deploy-trigger.
+            rsync -a --delete \
+              --exclude='README.md' \
+              --exclude='metadata.json' \
+              --exclude='smoke/' \
+              --exclude='tests/' \
+              --exclude='test/' \
+              --exclude='docs/' \
+              --exclude='examples/' \
+              --exclude='.deploy-trigger' \
+              --exclude='.DS_Store' \
+              "integrations/$fn/" "supabase/functions/$fn/"
             supabase functions deploy "$fn" \
               --project-ref "$PROJECT_REF" \
               --no-verify-jwt
