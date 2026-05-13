@@ -1,0 +1,63 @@
+name: Schema Change on Main Alert
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'schemas/**'
+
+# Opens a tracking issue whenever schema files land on main (e.g. via an
+# upstream sync). Schema changes are not auto-applied to the DB; the issue
+# is a reminder to review + apply manually, or close if you're skipping.
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Generate diff and open issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            let diff = '';
+            try {
+              diff = execSync("git diff HEAD^ HEAD -- 'schemas/**'").toString();
+            } catch (e) {
+              console.log('git diff failed:', e.message);
+              return;
+            }
+            if (!diff.trim()) {
+              console.log('No schema changes.');
+              return;
+            }
+            const sha7 = context.sha.slice(0, 7);
+            const MAX = 60000;
+            const shown = diff.length > MAX ? diff.slice(0, MAX) + '\n... (truncated)' : diff;
+            const body = [
+              `Schema files under \`schemas/\` changed on \`main\` at commit \`${context.sha}\`.`,
+              '',
+              '**This SQL is NOT auto-applied** — review and run against your database',
+              'manually if you want it. Close this issue when applied (or when skipping).',
+              '',
+              '<details>',
+              '<summary>SQL diff</summary>',
+              '',
+              '```diff',
+              shown,
+              '```',
+              '',
+              '</details>'
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Schema change on main: ${sha7}`,
+              body,
+              labels: ['schema-change']
+            });

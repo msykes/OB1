@@ -1,0 +1,64 @@
+name: Schema Change Review
+
+on:
+  pull_request:
+    paths:
+      - 'schemas/**'
+
+# Posts the SQL diff as a PR comment whenever a PR touches schemas/.
+# Schema changes are not auto-applied to the DB; this is just a heads-up
+# so the diff is reviewable inline before merge.
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate diff and comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const base = context.payload.pull_request.base.sha;
+            const head = context.payload.pull_request.head.sha;
+            let diff = '';
+            try {
+              diff = execSync(`git diff ${base} ${head} -- 'schemas/**'`).toString();
+            } catch (e) {
+              console.log('git diff failed:', e.message);
+              return;
+            }
+            if (!diff.trim()) {
+              console.log('No schema changes.');
+              return;
+            }
+            const MAX = 60000;
+            const shown = diff.length > MAX ? diff.slice(0, MAX) + '\n... (truncated, see Files changed tab for full diff)' : diff;
+            const body = [
+              '## :warning: Schema change detected',
+              '',
+              'This PR modifies SQL files under `schemas/`.',
+              '',
+              '**Schema changes are NOT auto-applied.** You must run the migrations',
+              'manually against your database after merge.',
+              '',
+              '<details>',
+              '<summary>SQL diff</summary>',
+              '',
+              '```diff',
+              shown,
+              '```',
+              '',
+              '</details>'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
