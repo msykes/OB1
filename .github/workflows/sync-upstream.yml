@@ -1,8 +1,6 @@
 name: Sync with upstream
 on:
-  schedule:
-    - cron: '0 */6 * * *'  # every 6 hours
-  workflow_dispatch:        # lets you trigger manually too
+  workflow_dispatch:        # manual trigger only; automated schedule disabled
 
 jobs:
   sync:
